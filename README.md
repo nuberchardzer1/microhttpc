@@ -1,9 +1,10 @@
 # simple-web-framework-in-c
 
-A minimal, educational HTTP web framework written in pure C using POSIX sockets.
+A **minimal and educational HTTP web framework** written in pure C using POSIX sockets.
 
-This project is designed to teach how HTTP servers and routing work at a low level — 
-no dependencies, just plain C and system calls.
+This project is designed to **teach and demonstrate** how HTTP servers and routing work at a low level — from handling raw TCP connections to parsing HTTP requests and building responses.  
+Inspired by the simplicity of Go’s [net/http](https://pkg.go.dev/net/http) package.
+
 
 ---
 
