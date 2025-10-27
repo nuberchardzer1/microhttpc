@@ -24,14 +24,14 @@ int serve_http(int fd, server srv, request req);
 ///
 /// @param addr A string specifying the address and port for the server to listen on (e.g. "0.0.0.0:8080").
 /// @return Returns `0` on success, or `-1` if the server setup (socket creation, binding, or parsing) fails.
-int listen_and_serve(char *addr){
+int listen_and_serve(char *addr, handle_func f){
     int sockfd;
     sa_in server_addr;
     if (parse_sockaddr(addr, &server_addr) < 0){
         return -1;
     }
 
-    server srv = { addr, server_addr };
+    server srv = { addr, server_addr, f };
 
     http_listen(srv, &sockfd);
     serve(srv, sockfd);
@@ -76,12 +76,10 @@ int serve(server srv, int sockfd){
             exit(EXIT_FAILURE);
         }
 
-        printf("New conn!\n");
-
         pid_t pid = fork();
         if (pid == 0){
+            printf("New conn!\n");
             rc = handle_connection(srv, conn);
-            close(conn);
             exit(0);
         }else if (pid > 0) 
             close(conn); 
@@ -91,17 +89,23 @@ int serve(server srv, int sockfd){
 
 
 int handle_connection(server srv, int conn_fd) {
+    char resp_buf[MAXPAYLOAD];
+    int n, rc;
     request req;
-    int rc = 0;
+    response resp = {0};
+    
     rio_t rp;
     rio_readinitb(&rp, conn_fd);
-    while (1) {
-        rc = read_request(&rp, &req);
-        printf("%d\n", rc);
-        if (rc < 0){
-            break;
-        }
+
+    rc = read_request(&rp, &req);
+    if (rc < 0) {
+        printf("read request error: %d\n", rc);
+        //TODO: Error malformed request
     }
+    srv.handle(&resp, &req);
+    n = marshall_response(&resp, resp_buf, sizeof(resp_buf));
+    rio_written(&rp, resp_buf, n);
+    close(conn_fd);
     return rc;
 }
 

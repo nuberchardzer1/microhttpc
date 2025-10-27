@@ -59,7 +59,7 @@ ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n){
     ssize_t nwrite;
     char *bufp = usrbuf;
 
-    while(nwrite > 0){
+    while(nleft > 0){
         if((nwrite = write(rio->rio_fd, bufp, nleft))){
             if (errno == EINTR){
                 nwrite = 0;
@@ -103,4 +103,27 @@ ssize_t rio_readn(rio_t *rio, void *usrbuf, size_t n){
         nleft -= nread;
     }
     return (n - nleft);
+}
+
+ssize_t read_all(int fd, void *usrbuf, ssize_t maxsize){
+    size_t cnt = 0;
+    ssize_t nread;
+    char *bufp = usrbuf;
+    
+    while(cnt < maxsize){
+        nread = read(fd, bufp, MAXSIZE);
+        if (nread < 0){
+            if (errno == EINTR){
+                nread = 0;
+            }else{
+                return -1;
+            }
+        }else if (nread == 0){
+            break;
+        }
+        bufp += nread;
+        cnt += nread;
+    }
+
+    return cnt;
 }

@@ -5,6 +5,8 @@
 #include "header.h"
 #include "rio.h"
 
+#define CRLF "\r\n"
+
 int read_payload(void *body, rio_t *rio, int n);
 
 int read_request(rio_t *rio, request *req){
@@ -35,4 +37,35 @@ int read_request(rio_t *rio, request *req){
     }
 
     return 0;
+}
+
+void write_status_code(response w, int code){
+    if (code < 100 || code > 999){
+        printf("wrong status code: %d", code);
+        exit(-1);
+    }
+}
+
+int marshall_response(response *resp, char *usrbuf, size_t size) {
+    int n = 0;
+
+    n += snprintf(usrbuf + n, size - n,
+                  "%s %d %s" CRLF,
+                  resp->req->proto,
+                  resp->status_code,
+                  resp->status_text);
+
+    header_t *hp = resp->headers;
+    for (int i = 0; i < resp->headers_cnt; i++, hp++) {
+        n += snprintf(usrbuf + n, size - n, "%s: %s" CRLF, hp->key, hp->val);
+    }
+
+    n += snprintf(usrbuf + n, size - n, CRLF);
+
+    if (resp->content_length > 0) {
+        memcpy(usrbuf + n, resp->body, resp->content_length);
+        n += resp->content_length;
+    }
+
+    return n;
 }

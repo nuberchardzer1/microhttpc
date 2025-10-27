@@ -17,5 +17,6 @@ ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n);
 void rio_readinitb(rio_t *rio, int fd);
 ssize_t rio_readn(rio_t *rio, void *usrbuf, size_t n);
 ssize_t rio_readline(rio_t *rio, void *usrbuf, int maxlen);
+ssize_t read_all(int fd, void *usrbuf, ssize_t maxsize);
 
 #endif
