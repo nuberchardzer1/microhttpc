@@ -1,3 +1,6 @@
+#ifndef RIO_H
+#define RIO_H
+
 #include <stdio.h>
 
 #define RIO_BUFSIZE 8192
@@ -14,3 +17,5 @@ ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n);
 void rio_readinitb(rio_t *rio, int fd);
 ssize_t rio_readn(rio_t *rio, void *usrbuf, size_t n);
 ssize_t rio_readline(rio_t *rio, void *usrbuf, int maxlen);
+
+#endif

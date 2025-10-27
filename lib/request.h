@@ -1,3 +1,6 @@
+#ifndef REQUEST_H
+#define REQUEST_H
+
 #include "header.h"
 
 #define MAXPAYLOAD 8192
@@ -30,3 +33,5 @@ typedef struct request{
 } request;
 
 int read_request(rio_t *rio, request *req); 
+
+#endif

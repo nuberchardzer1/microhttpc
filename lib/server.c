@@ -62,6 +62,7 @@ int http_listen(server srv, int *sockfd){
         exit(EXIT_FAILURE);
     }
     printf("Server is listening...\n");
+    return 0;
 }
 
 int serve(server srv, int sockfd){
@@ -96,7 +97,8 @@ int handle_connection(server srv, int conn_fd) {
     rio_readinitb(&rp, conn_fd);
     while (1) {
         rc = read_request(&rp, &req);
-        if (rc <= 0){
+        printf("%d\n", rc);
+        if (rc < 0){
             break;
         }
     }

@@ -17,7 +17,7 @@ int read_request(rio_t *rio, request *req){
     }
     // First line: GET /index.html HTTP/1.0
     sscanf(line, "%s %s %s", req->method, req->uri, req->proto);
-    if (strlen(req->method) < 0 || strlen(req->uri) < 0, strlen(req->proto) < 0)
+    if (strlen(req->method) < 0 || strlen(req->uri) < 0 || strlen(req->proto) < 0)
         return -1;
 
     if (read_headers(rio, req->headers, HTTP_MAX_HEADERS)){

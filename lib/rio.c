@@ -60,7 +60,7 @@ ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n){
     char *bufp = usrbuf;
 
     while(nwrite > 0){
-        if(nwrite = write(rio->rio_fd, bufp, nleft)){
+        if((nwrite = write(rio->rio_fd, bufp, nleft))){
             if (errno == EINTR){
                 nwrite = 0;
             }else{
