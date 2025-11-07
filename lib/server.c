@@ -93,6 +93,7 @@ int handle_connection(server srv, int conn_fd) {
     int n, rc;
     request req;
     response resp = {0};
+    resp.req = &req;
     
     rio_t rp;
     rio_readinitb(&rp, conn_fd);

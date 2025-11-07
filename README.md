@@ -13,8 +13,7 @@ Inspired by the simplicity of Go’s [net/http](https://pkg.go.dev/net/http) pac
 #include "http.h"
 
 void BaseHandler(response *resp, request *req) {
-    resp->req = req;
-    resp->status_code = 200;
+    resp->status_code = HTTP_STATUS_OK;
     strcpy(resp->status_text, "OK");
     strcpy(resp->content_type, "text/html");
 
@@ -49,7 +48,7 @@ int main(){
 - [x] Implement HTTP/1.1 request parsing
 - [ ] Implement persistent connections (Keep-Alive)
 - [ ] Add MIME type detection
-- [ ] Implement HTTP response helpers
+- [x] Implement HTTP response helpers
 ```
 void send_404(response *r);
 void send_500(response *r);
