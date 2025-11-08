@@ -32,7 +32,7 @@ typedef struct request{
 
     // Header contains the request header fields either received
 	// by the server or to be sent by the client.
-    headers_t headers;
+    header_map_t headers;
 
     // RequestURI is the unmodified request-target of the
 	// Request-Line as sent by the client to a server.
@@ -62,8 +62,7 @@ typedef struct response {
 
     char content_type[32];
 
-    headers_t headers;
-    int headers_cnt;
+    header_map_t headers;
     
     // Body stores the response payload
     char body[MAXPAYLOAD];

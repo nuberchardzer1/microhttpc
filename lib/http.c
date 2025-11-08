@@ -24,13 +24,12 @@ int read_request(rio_t *rio, request *req){
     if (strlen(req->method) < 0 || strlen(req->uri) < 0 || strlen(req->proto) < 0)
         return -1;
 
-    if (read_headers(rio, req->headers, HTTP_MAX_HEADERS)){
+    if (read_headers(rio, &req->headers, HTTP_MAX_HEADERS)){
         return -1;
     }
-
-    i = get_header_pos("Content-Length", req->headers, HTTP_MAX_HEADERS);
-    if (i != -1){
-        size_t content_length = atoi(req->headers[i].val);
+    char *c = get_header(&req->headers, "Content-Length");
+    if (c != NULL){
+        size_t content_length = atoi(c);
         req->content_length = content_length;
         n = rio_readn(rio, req->body, content_length);
         if (n < 0){
@@ -57,10 +56,13 @@ int marshall_response(response *resp, char *usrbuf, size_t size) {
                   resp->status_code,
                   resp->status_text);
 
-    header_t *hp = resp->headers;
-    for (int i = 0; i < resp->headers_cnt; i++, hp++) {
-        n += snprintf(usrbuf + n, size - n, "%s: %s" CRLF, hp->key, hp->val);
-    }
+    for (int i = 0; i < HEADER_BUCKETS; i++) {
+        header_t *hp = resp->headers.buckets[i];
+        while (hp) {
+            n += snprintf(usrbuf + n, size - n, "%s: %s" CRLF, hp->key, hp->val);
+            hp = hp->next;
+            }
+        }
 
     n += snprintf(usrbuf + n, size - n, CRLF);
 
@@ -76,18 +78,12 @@ void send_404(response *resp, request *req){
     resp->status_code = 404;
 
     strncpy(resp->body, NOT_FOUND, sizeof(resp->body) - 1);
-    resp->body[sizeof(resp->body) - 1] = '\0';
 
-    strncpy(resp->headers[0].key, "Content-Type", sizeof(resp->headers[0].key) - 1);
-    strncpy(resp->headers[0].val, "text/plain", sizeof(resp->headers[0].val) - 1);
-
-    strncpy(resp->headers[1].key, "Content-Length", sizeof(resp->headers[1].key) - 1);
-    snprintf(resp->headers[1].val, sizeof(resp->headers[1].val), "%zu", strlen(NOT_FOUND));
-
-    strncpy(resp->headers[2].key, "Connection", sizeof(resp->headers[2].key) - 1);
-    strncpy(resp->headers[2].val, "close", sizeof(resp->headers[2].val) - 1);
-
-    resp->headers_cnt = 3;
+    add_header(&resp->headers, "Content-Type", "text/plain");
+    char len_buf[32];
+    sprintf(len_buf, "%zu", strlen(NOT_FOUND));
+    add_header(&resp->headers, "Content-Length", len_buf);
+    add_header(&resp->headers, "Connection", "close");
     resp->content_length = strlen(NOT_FOUND);
 }
 
@@ -96,32 +92,25 @@ void send_500(response *resp) {
 
     strncpy(resp->body, INTERNAL_ERROR, sizeof(resp->body) - 1);
 
-    strncpy(resp->headers[0].key, "Content-Type", sizeof(resp->headers[0].key) - 1);
-    strncpy(resp->headers[0].val, "text/plain", sizeof(resp->headers[0].val) - 1);
+    size_t err_len = strlen(INTERNAL_ERROR);
 
-    strncpy(resp->headers[1].key, "Content-Length", sizeof(resp->headers[1].key) - 1);
-    snprintf(resp->headers[1].val, sizeof(resp->headers[1].val), "%zu", strlen(INTERNAL_ERROR));
-
-    strncpy(resp->headers[2].key, "Connection", sizeof(resp->headers[2].key) - 1);
-    strncpy(resp->headers[2].val, "close", sizeof(resp->headers[2].val) - 1);
-
-    resp->headers_cnt = 3;
-    resp->content_length = strlen(INTERNAL_ERROR);
+    add_header(&resp->headers, "Content-Type", "text/plain");
+    char len_buf[32];
+    sprintf(len_buf, "%zu", err_len);
+    add_header(&resp->headers, "Content-Length", len_buf);
+    add_header(&resp->headers, "Connection", "close");
+    resp->content_length = err_len;
 }
 
 void redirect(response *resp, int code, char *location) {
     resp->status_code = code;
 
-    strncpy(resp->headers[0].key, "Location", sizeof(resp->headers[0].key) - 1);
-    strncpy(resp->headers[0].val, location, sizeof(resp->headers[0].val) - 1);
+    add_header(&resp->headers, "Location", location);
+    char len_buf[32];
+    sprintf(len_buf, "%zu", strlen(NOT_FOUND));
+    add_header(&resp->headers, "Content-Length", len_buf);
+    add_header(&resp->headers, "Connection", "close");
 
-    strncpy(resp->headers[1].key, "Content-Length", sizeof(resp->headers[1].key) - 1);
-    snprintf(resp->headers[1].val, sizeof(resp->headers[1].val), "%zu", 0);
-
-    strncpy(resp->headers[2].key, "Connection", sizeof(resp->headers[2].key) - 1);
-    strncpy(resp->headers[2].val, "close", sizeof(resp->headers[2].val) - 1);
-
-    resp->headers_cnt = 3;
     resp->content_length = 0;
 }
 
@@ -134,13 +123,10 @@ void send_file(response *resp, const char *path){
     ssize_t n = read_all(fd, resp->body, sizeof(resp->body));
     close(fd);
 
+    add_header(&resp->headers, "Content-Type", "text/html");
+    char len_buf[32];
+    sprintf(len_buf, "%zd", n);
+    add_header(&resp->headers, "Content-Length", len_buf);
+    
     resp->content_length = n;
-
-    strcpy(resp->headers[0].key, "Content-Type");
-    strcpy(resp->headers[0].val, "text/html");
-
-    strcpy(resp->headers[1].key, "Content-Length");
-    snprintf(resp->headers[1].val, sizeof(resp->headers[1].val), "%zd", n);
-
-    resp->headers_cnt = 2;
 }

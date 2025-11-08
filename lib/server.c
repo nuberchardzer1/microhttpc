@@ -97,7 +97,6 @@ int handle_connection(server srv, int conn_fd) {
     
     rio_t rp;
     rio_readinitb(&rp, conn_fd);
-
     rc = read_request(&rp, &req);
     if (rc < 0) {
         printf("read request error: %d\n", rc);
