@@ -6,6 +6,8 @@ It provides a simple foundation for building web servers and handling routing, f
 
 Inspired by the simplicity of Go’s [net/http](https://pkg.go.dev/net/http) package.
 
+I`ll be glad to any ideas or contributions — feel free to open an issue or PR!
+
 --- 
 ## Example
 
@@ -24,7 +26,6 @@ void simple_handler(response *resp, request *req){
         char len_buf[32];
         sprintf(len_buf, "%zd", n);
         add_header(&resp->headers, "Content-Length", len_buf);
-        resp->content_length = n;
     }else{
         send_404(resp, req);
     }
@@ -34,6 +35,22 @@ int main(){
     listen_and_serve("localhost:8080", simple_handler);
 }
 ```
+---
+
+## How It Works
+
+`microhttpc` provides:
+
+- A **blocking TCP server** using `accept()` and `pthread` for concurrency.  
+- A simple **HTTP/1.1 parser** that fills a `request` struct with the method, URI, headers, and body.  
+- A lightweight **header map** for O(1) lookups.  
+- A `handle_func` callback that receives both `request *req` and `response *resp`.  
+  Inside the handler, you fill the `response` — set `status_code`, add headers, and write the body.  
+  The framework automatically serializes and sends it back to the client.  
+- Built-in helpers like `send_404()`, `send_file()`, and `send_500()`.  
+- Optional **Keep-Alive** and per-connection **read timeouts**.  
+
+No external dependencies — just pure C and POSIX.
 
 ---
 

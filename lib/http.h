@@ -57,20 +57,23 @@ typedef struct request{
 // A response represents the server side of an HTTP response.
 typedef struct response {
 
-    request *req; // Request for this response
+    // Associated request that triggered this response.
+    request *req;
 
-    int status_code; //Status code 
+    // HTTP status code (e.g. 200, 404, 500).
+    int status_code;
+
+    // Human-readable status text (e.g. "OK", "Not Found").
     char status_text[32];
 
+    // MIME type of the response body (e.g. "text/html").
     char content_type[32];
 
+    // Map of HTTP header fields.
     header_map_t headers;
     
-    // Body stores the response payload
+    // Response payload buffer. Must be accompanied by a valid "Content-Length" header.
     char body[MAXPAYLOAD];
-
-    size_t content_length;
-
 } response;
 
 //Callback function type 
@@ -93,23 +96,35 @@ typedef struct server {
     int write_timeout;
 } server;
 
+// Represents a single client connection.
 typedef struct conn{
-    // server is the server on which the connection arrived.
+    // server instance that accepted this connection.
     server *server;
 
-    // connection socket file descriptor
+    // Socket file descriptor associated with the client connection.
     int conn_fd;
 } conn;
 
-int read_request(rio_t *rio, request *req); 
+// Parse HTTP/1.1 request from buffered stream.
+int read_request(rio_t *rio, request *req);
+
+// Same as read_request(), but with timeout in ms.
 int read_request_with_timeout(rio_t *rio, request *req, int timeout_msecs);
 
-// listen_and_serve: listen socket and handles http requests
-int listen_and_serve(char *addr, handle_func);
+// Start blocking HTTP server and handle requests.
+int listen_and_serve(char *addr, handle_func handle);
+
+// Serialize response into HTTP/1.1 format.
 int marshall_response(response *resp, char *usrbuf, size_t size);
 
+// Send 404 Not Found response.
 void send_404(response *resp, request *req);
+
+// Send 500 Internal Server Error response.
 void send_500(response *resp);
+
+// Send 3xx redirect with Location header.
 void redirect(response *resp, int code, char *location);
 
+// Write minimal HTTP error into buffer.
 int send_http_error(void *usrbuf, int code, const char *reason, const char *body);

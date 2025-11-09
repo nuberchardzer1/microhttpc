@@ -9,6 +9,7 @@
 #include "rio.h"
 
 #define CRLF "\r\n"
+#define UNUSED(x) (void)(x)
 
 int read_request_with_timeout(rio_t *rio, request *req, int timeout_msecs){
     int n;
@@ -57,10 +58,12 @@ int marshall_response(response *resp, char *usrbuf, size_t size) {
         }
 
     n += snprintf(usrbuf + n, size - n, CRLF);
-
-    if (resp->content_length > 0) {
-        memcpy(usrbuf + n, resp->body, resp->content_length);
-        n += resp->content_length;
+    
+    char *c = get_header(&resp->headers, "Content-Length");
+    if (c != NULL){
+        size_t content_length = atoi(c);
+        memcpy(usrbuf + n, resp->body, content_length);
+        n += (int)content_length;
     }
 
     return n;
@@ -83,6 +86,8 @@ int send_http_error(void *usrbuf, int code, const char *reason, const char *body
 }
 
 void send_404(response *resp, request *req){
+    UNUSED(req);
+    
     resp->status_code = HTTP_STATUS_NOT_FOUND;
 
     strncpy(resp->body, NOT_FOUND, sizeof(resp->body) - 1);
@@ -92,7 +97,6 @@ void send_404(response *resp, request *req){
     sprintf(len_buf, "%zu", strlen(NOT_FOUND));
     add_header(&resp->headers, "Content-Length", len_buf);
     add_header(&resp->headers, "Connection", "close");
-    resp->content_length = strlen(NOT_FOUND);
 }
 
 void send_500(response *resp) {
@@ -107,7 +111,6 @@ void send_500(response *resp) {
     sprintf(len_buf, "%zu", err_len);
     add_header(&resp->headers, "Content-Length", len_buf);
     add_header(&resp->headers, "Connection", "close");
-    resp->content_length = err_len;
 }
 
 void redirect(response *resp, int code, char *location) {
@@ -118,8 +121,6 @@ void redirect(response *resp, int code, char *location) {
     sprintf(len_buf, "%zu", strlen(NOT_FOUND));
     add_header(&resp->headers, "Content-Length", len_buf);
     add_header(&resp->headers, "Connection", "close");
-
-    resp->content_length = 0;
 }
 
 void send_file(response *resp, const char *path){
@@ -135,6 +136,4 @@ void send_file(response *resp, const char *path){
     char len_buf[32];
     sprintf(len_buf, "%zd", n);
     add_header(&resp->headers, "Content-Length", len_buf);
-    
-    resp->content_length = n;
 }
