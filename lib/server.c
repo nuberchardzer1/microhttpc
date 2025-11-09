@@ -43,6 +43,7 @@ int listen_and_serve(char *addr, handle_func f){
         .server_addr = server_addr, 
         .handle = f, 
         .read_timeout = 60,
+        .write_timeout = 30,
     };
 
     printf("Server is listening on port: %d\n", port);
@@ -52,10 +53,13 @@ int listen_and_serve(char *addr, handle_func f){
 }
 
 int http_listen(server srv, int *sockfd){
+    int option = 1;
+
     if (((*sockfd) = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         perror("Socket Creation Failed");
         exit(EXIT_FAILURE);
     }
+    setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 
      /**
      * This binds the socket descriptor to the server thus enabling the server
@@ -116,40 +120,26 @@ void *handle_connection(void *conn_p) {
     rio_t rp;
     rio_readinitb(&rp, cc->conn_fd);
 
-    pthread_t tid;
-    pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-    read_req_thread_ctx req_ctx;
-    req_ctx.rio = &rp;
-    req_ctx.req = &req;
-    req_ctx.done = &cond;
-
-    struct timespec ts;
+    int r_timeout_msecs = cc->server->read_timeout * 1000;
+    int w_timeout_msecs = cc->server->write_timeout * 1000;
 
     while (1){
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += cc->server->read_timeout;
+        rc = read_request_with_timeout(&rp, &req, r_timeout_msecs);
+        if (rc < 0) {
+            if (errno == ETIMEDOUT){
+                printf("Timeout expired\n");
+                break;
+            }
 
-        pthread_create(&tid, NULL, read_request_thread, &req_ctx);
-
-        rc = pthread_cond_timedwait(&cond, &mu, &ts);
-        if (rc == ETIMEDOUT){
-            printf("Timeout expired\n");
-            pthread_cancel(tid);
-            break;
-        }
-
-        if (req_ctx.rc < 0) {
             char reason[] = "Bad Request";
             send_http_error(resp_buf, HTTP_STATUS_BAD_REQUEST, reason, reason);
-            printf("read request error: %d\n", rc);
             break;
         }
 
         cc->server->handle(&resp, &req);
-
+        
         n = marshall_response(&resp, resp_buf, sizeof(resp_buf));
-        if (rio_written(&rp, resp_buf, n) < 0) {
+        if (rio_written_with_timeout(&rp, resp_buf, n, w_timeout_msecs) < 0) {
             printf("write error\n");
             break;
         }

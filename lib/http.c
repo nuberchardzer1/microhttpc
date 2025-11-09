@@ -10,23 +10,11 @@
 
 #define CRLF "\r\n"
 
-int read_payload(void *body, rio_t *rio, int n);
-
-// Wrap for read_request to satisfy thread_create 
-void *read_request_thread(void *arg) {
-    read_req_thread_ctx *ctx = arg;
-    ctx->rc = read_request(ctx->rio, ctx->req);
-    pthread_cond_signal(ctx->done);
-    return NULL;
-}
-
-// Parse data from socket to request struct
-int 
-read_request(rio_t *rio, request *req){
+int read_request_with_timeout(rio_t *rio, request *req, int timeout_msecs){
     int n;
     char line[HTTP_MAX_LINE_LEN];
     
-    n = rio_readline(rio, line, HTTP_MAX_LINE_LEN);
+    n = rio_readline_with_timeout(rio, line, HTTP_MAX_LINE_LEN, timeout_msecs);
     if (n <= 0){
         return -1;
     }

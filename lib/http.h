@@ -88,6 +88,9 @@ typedef struct server {
 
     // Keep-Alive read timeout, in seconds
     int read_timeout;
+
+    // Keep-Alive write timeout, in seconds
+    int write_timeout;
 } server;
 
 typedef struct conn{
@@ -98,26 +101,8 @@ typedef struct conn{
     int conn_fd;
 } conn;
 
-typedef struct {
-    rio_t *rio;
-    request *req;
-    pthread_cond_t *done;
-    int rc;
-} read_req_thread_ctx;
-
-/**
- * Thread entry point for reading and parsing an HTTP request.
- *
- * @param arg Pointer to a `read_req_thread_ctx` structure containing:
- *        - `rio`: pointer to an initialized buffered I/O context
- *        - `req`: pointer to the request structure to be filled
- *        - `done`: pointer to a condition variable used for signaling
- *        - `rc`: integer field where the return code will be stored
- *
- * @return Always returns `NULL`. The result of `read_request()` is stored in `ctx->rc`.
- */
-void *read_request_thread(void *arg); 
 int read_request(rio_t *rio, request *req); 
+int read_request_with_timeout(rio_t *rio, request *req, int timeout_msecs);
 
 // listen_and_serve: listen socket and handles http requests
 int listen_and_serve(char *addr, handle_func);

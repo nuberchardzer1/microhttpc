@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <poll.h>
 
 #include "rio.h"
 
@@ -31,6 +32,43 @@ ssize_t rio_read(rio_t *rio, void *usrbuf, size_t n){
     return cnt;
 }
 
+/**
+ * Waits for a file descriptor to become ready for I/O or timeout.
+ *
+ * Thin wrapper around poll(2). Ensures at least one byte can be read/written,
+ * but subsequent I/O calls may still block if fewer bytes are available.
+ *
+ * @param fd            File descriptor to wait on.
+ * @param events        Events to wait for (POLLIN, POLLOUT, etc).
+ * @param timeout_msecs Timeout in milliseconds (-1 = infinite).
+ *
+ * @return 0 if ready;
+ *         -1 on timeout or error (errno = ETIMEDOUT, ECONNRESET, or poll error).
+ */
+int rio_wait_fd(int fd, short events, int timeout_msecs){
+    struct pollfd fds[1];
+    int rc;
+
+    fds[0].fd = fd;
+    fds[0].events = events;
+
+    rc = poll(fds, 1, timeout_msecs);
+    if (rc == 0){
+        errno = ETIMEDOUT; 
+        return -1; 
+    }
+    if (rc > 0){
+        if (fds[0].revents & events) {
+            return 0;
+        }
+        if (fds[0].revents & (POLLHUP)) {
+            errno = ECONNRESET; 
+            return -1;
+        }
+    }
+    return -1;
+}
+
 ssize_t rio_readline(rio_t *rio, void *usrbuf, int maxlen){
     int n, rc;
     char c, *bufp = usrbuf;
@@ -54,6 +92,14 @@ ssize_t rio_readline(rio_t *rio, void *usrbuf, int maxlen){
     return n;
 }
 
+ssize_t rio_readline_with_timeout(rio_t *rio, void *usrbuf, int maxlen, int timeout_msecs){
+    int rc = rio_wait_fd(rio->rio_fd, POLLIN, timeout_msecs);
+    if (rc < 0){
+        return -1;
+    }
+    return rio_readline(rio, usrbuf, maxlen); //ERROR: BLOCKED IF ARRIVED BYTES < N
+}
+
 //The rio writen function transfers n bytes from location usrbuf to descriptor fd.
 ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n){
     size_t nleft = n;
@@ -74,6 +120,14 @@ ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n){
         bufp += nwrite;
     }
     return (n - nleft);
+}
+
+ssize_t rio_written_with_timeout(rio_t *rio, void *usrbuf, size_t n, int timeout_msecs){
+    int rc = rio_wait_fd(rio->rio_fd, POLLOUT, timeout_msecs);
+    if (rc < 0){
+        return -1;
+    }
+    return rio_written(rio, usrbuf, n); //ERROR: CAN BLOCK
 }
 
 void rio_readinitb(rio_t *rp, int fd){
@@ -104,6 +158,14 @@ ssize_t rio_readn(rio_t *rio, void *usrbuf, size_t n){
         nleft -= nread;
     }
     return (n - nleft);
+}
+
+ssize_t rio_readn_with_timeout(rio_t *rio, void *usrbuf, size_t n, int timeout_msecs){
+    int rc = rio_wait_fd(rio->rio_fd, POLLIN, timeout_msecs);
+    if (rc < 0){
+        return -1;
+    }
+    return rio_readn(rio, usrbuf, n); //ERROR: BLOCKED IF ARRIVED BYTES < N
 }
 
 ssize_t read_all(int fd, void *usrbuf, ssize_t maxsize){
