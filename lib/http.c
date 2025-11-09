@@ -1,30 +1,41 @@
 #include <stdlib.h> 
 #include <string.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "http.h"
 #include "header.h"
 #include "rio.h"
-#include <fcntl.h>
-#include <unistd.h>
 
 #define CRLF "\r\n"
 
 int read_payload(void *body, rio_t *rio, int n);
 
-int read_request(rio_t *rio, request *req){
-    int i, n;
-    char line[HTTP_MAX_LINE_LEN], method[HTTP_MAX_LINE_LEN], uri[HTTP_MAX_LINE_LEN];
+// Wrap for read_request to satisfy thread_create 
+void *read_request_thread(void *arg) {
+    read_req_thread_ctx *ctx = arg;
+    ctx->rc = read_request(ctx->rio, ctx->req);
+    pthread_cond_signal(ctx->done);
+    return NULL;
+}
 
+// Parse data from socket to request struct
+int 
+read_request(rio_t *rio, request *req){
+    int n;
+    char line[HTTP_MAX_LINE_LEN];
+    
     n = rio_readline(rio, line, HTTP_MAX_LINE_LEN);
     if (n <= 0){
-        return n;
+        return -1;
     }
     // First line: GET /index.html HTTP/1.0
     sscanf(line, "%s %s %s", req->method, req->uri, req->proto);
-    if (strlen(req->method) < 0 || strlen(req->uri) < 0 || strlen(req->proto) < 0)
+    if (req->method[0] == '\0' || req->uri[0] == '\0' || req->proto[0] == '\0') {
         return -1;
-
-    if (read_headers(rio, &req->headers, HTTP_MAX_HEADERS)){
+    }
+    if (read_headers(rio, &req->headers, HTTP_MAX_HEADERS) < 0){
         return -1;
     }
     char *c = get_header(&req->headers, "Content-Length");
@@ -38,13 +49,6 @@ int read_request(rio_t *rio, request *req){
     }
 
     return 0;
-}
-
-void write_status_code(response w, int code){
-    if (code < 100 || code > 999){
-        printf("wrong status code: %d", code);
-        exit(-1);
-    }
 }
 
 int marshall_response(response *resp, char *usrbuf, size_t size) {
@@ -74,8 +78,24 @@ int marshall_response(response *resp, char *usrbuf, size_t size) {
     return n;
 }
 
+int send_http_error(void *usrbuf, int code, const char *reason, const char *body) {
+    char *buf = usrbuf;
+    size_t body_len = strlen(body);
+
+    int n = snprintf(buf, MAXPAYLOAD,
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Length: %zu\r\n"
+        "Content-Type: text/plain\r\n"
+        "Connection: close\r\n"
+        "\r\n"
+        "%s",
+        code, reason, body_len, body);
+
+    return n;
+}
+
 void send_404(response *resp, request *req){
-    resp->status_code = 404;
+    resp->status_code = HTTP_STATUS_NOT_FOUND;
 
     strncpy(resp->body, NOT_FOUND, sizeof(resp->body) - 1);
 

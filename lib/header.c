@@ -7,24 +7,28 @@
 int read_header(char *s, char *key, char *val);
 
 int read_headers(rio_t *rio, header_map_t *map, int maxcnt){
-    int i, n;
+    int n;
     int cnt = 0;
     char line[HTTP_MAX_LINE_LEN]; // redundant alloc? 
     header_t header; 
 
-    while(line[0] != '\n' && line[1] != '\n'){
+    while(1){
+        n = rio_readline(rio, line, HTTP_MAX_LINE_LEN);
+
+        if (line[0] == '\n' || line[1] == '\n'){
+            break;
+        }
+
         if (cnt >= maxcnt) // too many headers
             return -1;
 
-        n = rio_readline(rio, line, HTTP_MAX_LINE_LEN);
-        
         if (read_header(line, header.key, header.val) == -1){
             continue;
         }
 
         add_header(map, header.key, header.val);
     }
-    return 0;
+    return cnt;
 }
 
 int read_header(char *s, char *key, char *val){
@@ -69,7 +73,7 @@ unsigned long hash(unsigned char *str){
     unsigned long hash = 5381;
     int c;
 
-    while (c = *str++)
+    while ((c = *str++))
         hash = hash * 33 + c;
 
     return hash;
@@ -119,4 +123,16 @@ char *get_header(header_map_t *map, char *key){
         node = node->next;
     }
     return NULL;
+}
+
+void free_header_map(header_map_t *map) {
+    for (int i = 0; i < HEADER_BUCKETS; i++) {
+        header_t *node = map->buckets[i];
+        while (node) {
+            header_t *next = node->next;
+            free(node);
+            node = next;
+        }
+        map->buckets[i] = NULL;
+    }
 }

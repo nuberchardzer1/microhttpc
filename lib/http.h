@@ -1,4 +1,6 @@
 #include <netinet/in.h>
+#include <pthread.h>
+
 #include "rio.h"
 #include "header.h"
 
@@ -71,14 +73,50 @@ typedef struct response {
 
 } response;
 
+//Callback function type 
 typedef void (*handle_func)(response *resp, request *req);
 
-typedef struct server{
+typedef struct server {
+    // Server bind address (e.g., "127.0.0.1:8080")
     char *addr;
+
+    // Socket address structure used for binding and listening
     struct sockaddr_in server_addr;
+
+    // Callback function that processes client requests
     handle_func handle;
+
+    // Keep-Alive read timeout, in seconds
+    int read_timeout;
 } server;
 
+typedef struct conn{
+    // server is the server on which the connection arrived.
+    server *server;
+
+    // connection socket file descriptor
+    int conn_fd;
+} conn;
+
+typedef struct {
+    rio_t *rio;
+    request *req;
+    pthread_cond_t *done;
+    int rc;
+} read_req_thread_ctx;
+
+/**
+ * Thread entry point for reading and parsing an HTTP request.
+ *
+ * @param arg Pointer to a `read_req_thread_ctx` structure containing:
+ *        - `rio`: pointer to an initialized buffered I/O context
+ *        - `req`: pointer to the request structure to be filled
+ *        - `done`: pointer to a condition variable used for signaling
+ *        - `rc`: integer field where the return code will be stored
+ *
+ * @return Always returns `NULL`. The result of `read_request()` is stored in `ctx->rc`.
+ */
+void *read_request_thread(void *arg); 
 int read_request(rio_t *rio, request *req); 
 
 // listen_and_serve: listen socket and handles http requests
@@ -88,3 +126,5 @@ int marshall_response(response *resp, char *usrbuf, size_t size);
 void send_404(response *resp, request *req);
 void send_500(response *resp);
 void redirect(response *resp, int code, char *location);
+
+int send_http_error(void *usrbuf, int code, const char *reason, const char *body);

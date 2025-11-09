@@ -18,5 +18,6 @@ typedef struct header_map_t{
 int read_headers(rio_t *rio, header_map_t *headers, int maxcnt);
 void add_header(header_map_t *map, char *key, char *val);
 char *get_header(header_map_t *map, char *key); 
+void free_header_map(header_map_t *map);
 
 #endif

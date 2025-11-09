@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include "rio.h"
 #include <string.h>
+
+#include "rio.h"
 
 #define MAXSIZE 1024
 
@@ -60,7 +61,7 @@ ssize_t rio_written(rio_t *rio, void *usrbuf, size_t n){
     char *bufp = usrbuf;
 
     while(nleft > 0){
-        if((nwrite = write(rio->rio_fd, bufp, nleft))){
+        if((nwrite = write(rio->rio_fd, bufp, nleft) < 0)){
             if (errno == EINTR){
                 nwrite = 0;
             }else{
